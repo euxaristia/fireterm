@@ -132,8 +132,8 @@ public struct Fireplace: Sendable {
 
         // Draw logs
         let logLine1 = "     ___============___     "
-        let logLine2 = "    |  \\\\~~~~~~~~~~~~//  |    "
-        let logLine3 = "    |___\\\\__________//__|    "
+        let logLine2 = "   |  \\\\~~~~~~~~~~~~//  |   "
+        let logLine3 = "   |___\\\\__________//___|   "
 
         append("\u{1B}[38;2;139;69;19m", to: &buffer)
         for log in [logLine1, logLine2, logLine3] {
