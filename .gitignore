@@ -1,7 +1,5 @@
-.build/
-.swiftpm/
-Package.resolved
-*.xcodeproj/
-*.xcworkspace/
-DerivedData/
+/target
+Cargo.lock
+*.swp
+*.swo
 .DS_Store
