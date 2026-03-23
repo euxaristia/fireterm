@@ -90,30 +90,38 @@ public struct Fireplace: Sendable {
         heat = newHeat
     }
 
-    public func render(into buffer: inout [UInt8]) {
-        // Reset cursor to top-left
-        append("\u{1B}[H", to: &buffer)
+    public func render(into buffer: inout [UInt8], terminalSize: (rows: Int, cols: Int)? = nil) {
+        let (termRows, termCols) = terminalSize ?? Terminal.size
+        guard termCols > 0 && termRows > 0 else { return }
 
-        let (termRows, termCols) = Terminal.size
-        let startCol = max(0, (termCols - width) / 2)
-        let startRow = max(0, (termRows - height - 7) / 2)
+        // Clamp visible width to terminal
+        let visibleWidth = min(width, termCols - 2)
+        guard visibleWidth > 0 else { return }
 
-        // Move to start position
-        append("\u{1B}[\(startRow);1H", to: &buffer)
+        let startCol = max(1, (termCols - visibleWidth) / 2 + 1)
+        let totalHeight = height + 7  // fire + title + logs + hearth + footer
+        let startRow = max(1, (termRows - totalHeight) / 2 + 1)
+
+        // Clear screen and reset
+        append("\u{1B}[2J", to: &buffer)
+
+        var row = startRow
 
         // Title
         let title = "  F I R E T E R M  "
-        let titlePad = max(0, (termCols - title.count) / 2)
+        let titleCol = max(1, (termCols - title.count) / 2 + 1)
+        moveTo(row: row, col: titleCol, buffer: &buffer)
         append("\u{1B}[38;2;255;160;40m", to: &buffer)
-        append(String(repeating: " ", count: titlePad), to: &buffer)
         append(title, to: &buffer)
-        append("\u{1B}[0m\n\n", to: &buffer)
+        append("\u{1B}[0m", to: &buffer)
+        row += 2
 
+        // Fire
         var prevR = -1, prevG = -1, prevB = -1
 
         for y in 0..<height {
-            append(String(repeating: " ", count: startCol), to: &buffer)
-            for x in 0..<width {
+            moveTo(row: row, col: startCol, buffer: &buffer)
+            for x in 0..<visibleWidth {
                 let h = heat[y][x]
                 let idx = min(palette.count - 1, Int(h * Double(palette.count - 1)))
                 let (r, g, b) = palette[idx]
@@ -126,8 +134,9 @@ public struct Fireplace: Sendable {
                 let charIdx = min(flameChars.count - 1, Int(h * Double(flameChars.count - 1)))
                 buffer.append(contentsOf: String(flameChars[charIdx]).utf8)
             }
-            append("\u{1B}[0m\n", to: &buffer)
+            append("\u{1B}[0m", to: &buffer)
             prevR = -1; prevG = -1; prevB = -1
+            row += 1
         }
 
         // Draw logs
@@ -137,28 +146,33 @@ public struct Fireplace: Sendable {
 
         append("\u{1B}[38;2;139;69;19m", to: &buffer)
         for log in [logLine1, logLine2, logLine3] {
-            let pad = max(0, (termCols - log.count) / 2)
-            append(String(repeating: " ", count: pad), to: &buffer)
+            let logCol = max(1, (termCols - log.count) / 2 + 1)
+            moveTo(row: row, col: logCol, buffer: &buffer)
             append(log, to: &buffer)
-            append("\n", to: &buffer)
+            row += 1
         }
 
         // Brick hearth
         append("\u{1B}[38;2;120;50;30m", to: &buffer)
-        let brickRow = String(repeating: "▄", count: width + 4)
-        let brickPad = max(0, (termCols - brickRow.count) / 2)
-        append(String(repeating: " ", count: brickPad), to: &buffer)
+        let brickCount = min(visibleWidth + 4, termCols - 2)
+        let brickRow = String(repeating: "▄", count: brickCount)
+        let brickCol = max(1, (termCols - brickCount) / 2 + 1)
+        moveTo(row: row, col: brickCol, buffer: &buffer)
         append(brickRow, to: &buffer)
-        append("\n", to: &buffer)
+        row += 2
 
         // Footer
-        append("\u{1B}[0m\n", to: &buffer)
+        append("\u{1B}[0m", to: &buffer)
         let footer = "Press any key to exit"
-        let footerPad = max(0, (termCols - footer.count) / 2)
-        append(String(repeating: " ", count: footerPad), to: &buffer)
+        let footerCol = max(1, (termCols - footer.count) / 2 + 1)
+        moveTo(row: row, col: footerCol, buffer: &buffer)
         append("\u{1B}[38;2;100;100;100m", to: &buffer)
         append(footer, to: &buffer)
         append("\u{1B}[0m", to: &buffer)
+    }
+
+    private func moveTo(row: Int, col: Int, buffer: inout [UInt8]) {
+        append("\u{1B}[\(row);\(col)H", to: &buffer)
     }
 
     private func append(_ s: String, to buffer: inout [UInt8]) {
