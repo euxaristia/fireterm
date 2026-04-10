@@ -1,7 +1,14 @@
 use "time"
 use "collections"
+use "lib:terminal"
 use @write[ISize](fd: I32, buffer: Pointer[None], bytes_to_send: I32)
 use @usleep[I32](usecs: U32)
+use @term_enable_raw[None]()
+use @term_disable_raw[None]()
+use @term_key_pressed[I32]()
+use @term_get_size[None](rows: Pointer[I32], cols: Pointer[I32])
+use @term_hide_cursor[None]()
+use @term_show_cursor[None]()
 
 primitive XorShift64
   """Xorshift64* PRNG"""

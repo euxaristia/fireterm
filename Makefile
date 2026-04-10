@@ -8,8 +8,13 @@ TEST_BINARY := $(BUILD_DIR)/fireterm_tests
 
 all: build
 
-build:
-	ponyc -o $(BUILD_DIR) $(SRC_DIR) -b fireterm --linker gcc
+build: $(BUILD_DIR)/libterminal.a
+	ponyc -o $(BUILD_DIR) -p $(BUILD_DIR) $(SRC_DIR) -b fireterm --linker gcc
+
+$(BUILD_DIR)/libterminal.a: $(SRC_DIR)/terminal.c
+	@mkdir -p $(BUILD_DIR)
+	gcc -c -o $(BUILD_DIR)/terminal.o $<
+	ar rcs $@ $(BUILD_DIR)/terminal.o
 
 run: build
 	$(BINARY)
