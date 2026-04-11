@@ -65,6 +65,8 @@ actor Main
       _fireplace = _create_fireplace(cur_rows, cur_cols)
       _prev_rows = cur_rows
       _prev_cols = cur_cols
+      // Clear screen on resize to remove stale content
+      _env.out.write("\x1B[2J")
     end
 
     let start = Clock.now()
