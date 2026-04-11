@@ -76,6 +76,7 @@ class Fireplace
   """Simulates and renders a fireplace animation using heat propagation."""
   let width: USize
   let height: USize
+  let _fuel_rows: USize
   var _heat: Array[Array[F64] val] ref
   let _palette: Palette val
   let _flame_chars: Array[U8] val
@@ -83,6 +84,8 @@ class Fireplace
   new create(width': USize, height': USize, palette: Palette val) =>
     width = width'
     height = height'
+    // More fuel rows for taller fires to provide a stronger heat source
+    _fuel_rows = if height' > 30 then 4 elseif height' > 20 then 3 else 2 end
     _palette = palette
 
     _flame_chars = recover val [
@@ -99,15 +102,16 @@ class Fireplace
     ] end
 
     let heat = recover Array[Array[F64] val] end
-    for y in Range(0, height' + 2) do
+    for y in Range(0, height' + _fuel_rows) do
       let row = recover Array[F64].init(0.0, width') end
       heat.push(consume row)
     end
     _heat = consume heat
 
   fun ref update(rng: {ref apply(): F64} ref) =>
-    // Seed bottom two rows with random heat (fuel source)
-    for y in Range(height, height + 2) do
+    // Seed bottom fuel rows with random heat (fuel source)
+    let fuel_rows: USize = _fuel_rows
+    for y in Range(height, height + fuel_rows) do
       try
         let heat_row = _heat(y)?
         var new_row = recover Array[F64].init(0.0, heat_row.size()) end
@@ -125,6 +129,10 @@ class Fireplace
       end
     end
 
+    // Scale cooling and turbulence to fire height
+    // Reference height of 20 — at that size the original constants felt right
+    let h_scale = height.f64() / 20.0
+
     // Propagate heat upward with cooling, spread, and turbulence
     let new_heat = recover Array[Array[F64] val] end
     for y in Range(0, height) do
@@ -132,7 +140,7 @@ class Fireplace
       for x in Range(0, width) do
         try
           let below = y + 1
-          let below2 = if (y + 2) < (height + 2) then (y + 2) else (height + 1) end
+          let below2 = if (y + 2) < (height + fuel_rows) then (y + 2) else ((height + fuel_rows) - 1) end
 
           var sum = (_heat(below)?(x)?) * 3.0
           sum = sum + ((_heat(below2)?(x)?) * 2.0)
@@ -151,13 +159,14 @@ class Fireplace
           end
           sum = sum / 8.0
 
-          // Cooling factor -- more cooling at the top
+          // Cooling factor — scale with height so taller fires don't die out
           let height_ratio = 1.0 - (y.f64() / height.max(1).f64())
-          let cooling = 0.92 - ((1.0 - height_ratio) * 0.06)
-          sum = sum * cooling
+          let base_cooling = 0.96 - ((1.0 - height_ratio) * (0.04 / h_scale))
+          sum = sum * base_cooling
 
-          // Turbulence
-          sum = sum + (-0.03 + (rng() * 0.06))
+          // Turbulence — reduce for taller fires to avoid harsh flicker
+          let turb = 0.03 / h_scale
+          sum = sum + (-turb + (rng() * (turb * 2.0)))
 
           try
             row(x)? = sum.max(0.0).min(1.0)
@@ -167,8 +176,8 @@ class Fireplace
       new_heat.push(consume row)
     end
 
-    // Preserve the two fuel rows at the bottom
-    for y in Range(height, height + 2) do
+    // Preserve the fuel rows at the bottom
+    for y in Range(height, height + fuel_rows) do
       try
         new_heat.push(_heat(y)?)
       else
@@ -197,8 +206,8 @@ class Fireplace
     let total_height = height + 7
     let start_row = (((if term_rows > total_height then (term_rows - total_height) else 0 end) / 2) + 1).max(1)
 
-    // Clear screen
-    buf.append("\x1B[2J")
+    // Move cursor home (no clear — avoids flicker)
+    buf.append("\x1B[H")
 
     var row = start_row
 
